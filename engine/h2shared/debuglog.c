@@ -75,7 +75,12 @@ void LOG_Print (const char *logdata)
 	if (log_fd == -1)
 		return;
 
-	write (log_fd, logdata, strlen(logdata));
+	if (write(log_fd, logdata, strlen(logdata)) < 0)
+	{
+		Sys_PrintTerm ("Error writing to log file\n");
+		LOG_Close ();
+		con_debuglog = LOG_NONE;
+	}
 }
 #endif
 
@@ -190,4 +195,3 @@ void LOG_Close (void)
 	log_fd = -1;
 }
 #endif
-
