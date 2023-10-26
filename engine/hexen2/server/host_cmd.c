@@ -400,16 +400,16 @@ Host_SavegameComment
 Writes a SAVEGAME_COMMENT_LENGTH character comment describing the game saved
 ===============
 */
-static void Host_SavegameComment (char *text)
+static void Host_SavegameComment (char text[SAVEGAME_COMMENT_LENGTH + 1])
 {
 	size_t		i;
 	char		temp[20];
 	const char	*levelname;
+	char		*p;
 
 	for (i = 0; i < SAVEGAME_COMMENT_LENGTH; i++)
-	{
 		text[i] = ' ';
-	}
+	text[SAVEGAME_COMMENT_LENGTH] = '\0';
 
 /* see SAVEGAME_COMMENT_LENGTH definition in quakedef.h */
 	levelname = SV_GetLevelname ();
@@ -417,6 +417,12 @@ static void Host_SavegameComment (char *text)
 	if (i > 20)
 		i = 20;
 	memcpy (text, levelname, i);
+
+/* remove CR/LFs from level name to avoid broken saves */
+	while ((p = strchr(text, '\n')) != NULL)
+		*p = ' ';
+	while ((p = strchr(text, '\r')) != NULL)
+		*p = ' ';
 
 	Sys_DateTimeString (temp);
 	temp[16] = '\0'; // eliminate seconds
@@ -429,8 +435,6 @@ static void Host_SavegameComment (char *text)
 		if (text[i] == ' ')
 			text[i] = '_';
 	}
-
-	text[SAVEGAME_COMMENT_LENGTH] = '\0';
 }
 
 /*
@@ -516,7 +520,7 @@ static void Host_Savegame_f (void)
 	FS_MakePath_VABUF (FS_USERDIR, &error_state, savedest, sizeof(savedest), "%s/info.dat", p);
 	if (error_state)
 	{
-		Host_Error("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
+		Host_Error ("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
 		return;
 	}
 	f = fopen (savedest, "w");
@@ -625,30 +629,30 @@ static void Host_Loadgame_f (void)
 
 	if (q_snprintf(savedest, sizeof(savedest), "%s/info.dat", savename) >= (int)sizeof(savedest))
 	{
-		Host_Error("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
+		Host_Error ("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
 		return;
 	}
 
 	f = fopen (savedest, "r");
 	if (!f)
 	{
-		Con_Printf ("%s: ERROR: couldn't open savefile\n", __thisfunc__);
+		Host_Error ("%s: ERROR: couldn't open savefile", __thisfunc__);
 		return;
 	}
 
-	fscanf (f, "%i\n", &version);
-
+	if (fscanf (f, "%i\n", &version) != 1)
+		goto fail;
 	if (version != SAVEGAME_VERSION)
 	{
 		fclose (f);
-		Con_Printf ("Savegame is version %i, not %i\n", version, SAVEGAME_VERSION);
+		Host_Error ("Savegame is version %i, not %i", version, SAVEGAME_VERSION);
 		return;
 	}
-	fscanf (f, "%s\n", str);
+	error_state += fscanf (f, "%s\n", str) != 1;
 	for (i = 0; i < NUM_SPAWN_PARMS; i++)
-		fscanf (f, "%f\n", &spawn_parms[i]);
+		error_state += fscanf (f, "%f\n", &spawn_parms[i]) != 1;
 // this silliness is so we can load 1.06 save files, which have float skill values
-	fscanf (f, "%f\n", &tempf);
+	error_state += fscanf (f, "%f\n", &tempf) != 1;
 	current_skill = (int)(tempf + 0.1);
 	Cvar_SetValue ("skill", current_skill);
 
@@ -657,50 +661,54 @@ static void Host_Loadgame_f (void)
 	Cvar_Set ("teamplay", "0");
 	Cvar_Set ("randomclass", "0");
 
-	fscanf (f, "%s\n", mapname);
-	fscanf (f, "%f\n", &playtime);
+	error_state += fscanf (f, "%s\n", mapname) != 1;
+	error_state += fscanf (f, "%f\n", &playtime) != 1;
 
 	tempi = -1;
-	fscanf (f, "%d\n", &tempi);
+	error_state += fscanf (f, "%d\n", &tempi) != 1;
 	if (tempi >= 1)
 		svs.maxclients = tempi;
 
 	tempf = -1;
-	fscanf (f, "%f\n", &tempf);
+	error_state += fscanf (f, "%f\n", &tempf) != 1;
 	if (tempf >= 0)
 		Cvar_SetValue ("deathmatch", tempf);
 
 	tempf = -1;
-	fscanf (f, "%f\n", &tempf);
+	error_state += fscanf (f, "%f\n", &tempf) != 1;
 	if (tempf >= 0)
 		Cvar_SetValue ("coop", tempf);
 
 	tempf = -1;
-	fscanf (f, "%f\n", &tempf);
+	error_state += fscanf (f, "%f\n", &tempf) != 1;
 	if (tempf >= 0)
 		Cvar_SetValue ("teamplay", tempf);
 
 	tempf = -1;
-	fscanf (f, "%f\n", &tempf);
+	error_state += fscanf (f, "%f\n", &tempf) != 1;
 	if (tempf >= 0)
 		Cvar_SetValue ("randomclass", tempf);
 
-	tempf = -1;
-	fscanf (f, "%f\n", &tempf);
-		// nothing to do with this tempf (cl_playerclass.value)
+	//_cl_playerclass
+	error_state += fscanf (f, "%f\n", &tempf) != 1;
 
 	// mission pack, objectives strings
-	fscanf (f, "%u\n", &info_mask);
-	fscanf (f, "%u\n", &info_mask2);
+	tempi  = fscanf (f, "%u\n", &info_mask) != 1;
+	tempi += fscanf (f, "%u\n", &info_mask2) != 1;
+	if (gameflags & GAME_PORTALS)
+		error_state += tempi;
 
 	fclose (f);
 
 	Host_RemoveGIPFiles(FS_GetUserdir());
 
+	if (error_state)
+		goto fail;
+
 	FS_MakePath_BUF (FS_USERDIR, NULL, savedest, sizeof(savedest), Cmd_Argv(1));
 	error_state = Host_CopyFiles(savedest, "*.gip", FS_GetUserdir());
 	if (error_state)
-	{
+	{  fail:
 		Host_Error ("%s: The game could not be loaded properly!", __thisfunc__);
 		return;
 	}
@@ -738,7 +746,7 @@ int SaveGamestate (qboolean ClientsOnly)
 		FS_MakePath_BUF (FS_USERDIR, &error_state, savename, sizeof(savename), "clients.gip");
 		if (error_state)
 		{
-			Host_Error("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
+			Host_Error ("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
 			return -1;
 		}
 	}
@@ -750,7 +758,7 @@ int SaveGamestate (qboolean ClientsOnly)
 		FS_MakePath_VABUF (FS_USERDIR, &error_state, savename, sizeof(savename), "%s.gip", sv.name);
 		if (error_state)
 		{
-			Host_Error("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
+			Host_Error ("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
 			return -1;
 		}
 	}
@@ -819,7 +827,7 @@ int SaveGamestate (qboolean ClientsOnly)
 
 finish:
 	if (error_state)
-		Host_Error ("%s: The level could not be saved properly!", __thisfunc__);
+		Host_Error ("%s: The game could not be saved properly!", __thisfunc__);
 
 	return error_state;
 }
@@ -873,7 +881,7 @@ static int LoadGamestate (const char *level, const char *startspot, int ClientsM
 	float		playtime, sk;
 	char		str[32768];
 	const char	*start;
-	int		i, r;
+	int		i, err;
 	edict_t		*ent;
 	int		entnum;
 	int		version;
@@ -887,19 +895,19 @@ static int LoadGamestate (const char *level, const char *startspot, int ClientsM
 			Con_Printf ("%s: server not active\n", __thisfunc__);
 			return -1;
 		}
-		FS_MakePath_BUF (FS_USERDIR, &r, savename, sizeof(savename), "clients.gip");
-		if (r)
+		FS_MakePath_BUF (FS_USERDIR, &err, savename, sizeof(savename), "clients.gip");
+		if (err)
 		{
-			Host_Error("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
+			Host_Error ("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
 			return -1;
 		}
 	}
 	else
 	{
-		FS_MakePath_VABUF (FS_USERDIR, &r, savename, sizeof(savename), "%s.gip", level);
-		if (r)
+		FS_MakePath_VABUF (FS_USERDIR, &err, savename, sizeof(savename), "%s.gip", level);
+		if (err)
 		{
-			Host_Error("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
+			Host_Error ("%s: %d: string buffer overflow!", __thisfunc__, __LINE__);
 			return -1;
 		}
 
@@ -910,31 +918,31 @@ static int LoadGamestate (const char *level, const char *startspot, int ClientsM
 	f = fopen (savename, "r");
 	if (!f)
 	{
-		if (ClientsMode == 2)
-			Con_Printf ("%s: ERROR: couldn't open savefile\n", __thisfunc__);
+		if (ClientsMode == 2) /* caller: Host_Loadgame_f() */
+			Host_Error ("%s: ERROR: couldn't open savefile", __thisfunc__);
 
 		return -1;
 	}
 
-	fscanf (f, "%i\n", &version);
-
+	if (fscanf (f, "%i\n", &version) != 1)
+		goto fail;
 	if (version != SAVEGAME_VERSION)
 	{
 		fclose (f);
-		Con_Printf ("Savegame is version %i, not %i\n", version, SAVEGAME_VERSION);
+		Host_Error ("Savegame is version %i, not %i", version, SAVEGAME_VERSION);
 		return -1;
 	}
 
 	if (ClientsMode != 1)
 	{
-		fscanf (f, "%s\n", str);
+		err += fscanf (f, "%s\n", str) != 1;
 	//	for (i = 0; i < NUM_SPAWN_PARMS; i++)
-	//		fscanf (f, "%f\n", &spawn_parms[i]);
-		fscanf (f, "%f\n", &sk);
+	//		err += fscanf (f, "%f\n", &spawn_parms[i]) != 1;
+		err += fscanf (f, "%f\n", &sk) != 1;
 		Cvar_SetValue ("skill", sk);
 
-		fscanf (f, "%s\n", mapname);
-		fscanf (f, "%f\n", &playtime);
+		err += fscanf (f, "%s\n", mapname) != 1;
+		err += fscanf (f, "%f\n", &playtime) != 1;
 
 		SV_SpawnServer (mapname, startspot);
 		if (!sv.active)
@@ -947,19 +955,25 @@ static int LoadGamestate (const char *level, const char *startspot, int ClientsM
 	// load the light styles
 		for (i = 0; i < MAX_LIGHTSTYLES; i++)
 		{
-			fscanf (f, "%s\n", str);
+			err += fscanf (f, "%s\n", str) != 1;
 			sv.lightstyles[i] = (const char *)Hunk_Strdup (str, "lightstyles");
 		}
 		SV_LoadEffects (f);
 	}
 
+	if (err)
+	{  fail:
+		fclose (f);
+		Host_Error ("%s: The game could not be loaded properly!", __thisfunc__);
+	}
+
 // load the edicts out of the savegame file
 	while (!feof(f))
 	{
-		fscanf (f, "%i\n", &entnum);
+		err = fscanf (f, "%i\n", &entnum);
 		for (i = 0; i < (int) sizeof(str) - 1; i++)
 		{
-			r = fgetc (f);
+			int r = fgetc (f);
 			if (r == EOF || !r)
 				break;
 			str[i] = r;
@@ -979,6 +993,9 @@ static int LoadGamestate (const char *level, const char *startspot, int ClientsM
 		start = COM_Parse(str);
 		if (!com_token[0])
 			break;		// end of file
+		// actually we should be able to break out earlier if err==EOF, no?
+		if (err != 1)
+			goto fail;
 		if (strcmp(com_token,"{"))
 		{
 			fclose (f);
