@@ -1240,19 +1240,22 @@ Fills a box of pixels with a single color
 void Draw_Fill (int x, int y, int w, int h, int c)
 {
 	glDisable_fp (GL_TEXTURE_2D);
+	glEnable_fp (GL_BLEND); //johnfitz -- for alpha
+	glDisable_fp (GL_ALPHA_TEST); //johnfitz -- for alpha
 	glColor3f_fp (host_basepal[c*3]/255.0,
 				host_basepal[c*3+1]/255.0,
 				host_basepal[c*3+2]/255.0);
 
 	glBegin_fp (GL_QUADS);
-
 	glVertex2f_fp (x,y);
 	glVertex2f_fp (x+w, y);
 	glVertex2f_fp (x+w, y+h);
 	glVertex2f_fp (x, y+h);
-
 	glEnd_fp ();
+
 	glColor3f_fp (1,1,1);
+	glDisable_fp (GL_BLEND); //johnfitz -- for alpha
+	glEnable_fp (GL_ALPHA_TEST); //johnfitz -- for alpha
 	glEnable_fp (GL_TEXTURE_2D);
 }
 
@@ -1882,6 +1885,6 @@ GL_LoadPicTexture
 */
 GLuint GL_LoadPicTexture (qpic_t *pic)
 {
-	return GL_LoadTexture ("", pic->data, pic->width, pic->height, TEX_ALPHA|TEX_LINEAR);
+	return GL_LoadTexture ("", pic->data, pic->width, pic->height, TEX_ALPHA|TEX_NEAREST);
 }
 
