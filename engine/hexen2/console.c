@@ -519,6 +519,11 @@ void Con_DrawNotify (void)
 	v = 0;
 	for (i = con->current-NUM_CON_TIMES+1; i <= con->current; i++)
 	{
+
+#ifdef GLQUAKE
+	glEnable_fp (GL_BLEND);
+#endif
+
 		if (i < 0)
 			continue;
 		time = con_times[i % NUM_CON_TIMES];
@@ -537,10 +542,20 @@ void Con_DrawNotify (void)
 			Draw_Character ((x+1)<<3, v, text[x]);
 
 		v += 8;
+
+#ifdef GLQUAKE
+	glDisable_fp (GL_BLEND);
+#endif
+
 	}
 
 	if (Key_GetDest() == key_message)
 	{
+
+#ifdef GLQUAKE
+	glEnable_fp (GL_BLEND);
+#endif
+
 		const char	*s;
 
 		if (scr_viewsize.integer < 100)
@@ -572,6 +587,11 @@ void Con_DrawNotify (void)
 
 		Draw_Character (x<<3, v, 10 + ((int)(realtime*con_cursorspeed)&1));
 		v += 8;
+
+#ifdef GLQUAKE
+	glDisable_fp (GL_BLEND);
+#endif
+
 	}
 
 	if (v > con_notifylines)
@@ -596,6 +616,10 @@ void Con_DrawConsole (int lines)
 
 // draw the background
 	Draw_ConsoleBackground (lines);
+
+#ifdef GLQUAKE
+	glEnable_fp (GL_BLEND);
+#endif
 
 // draw the text
 	con_vislines = lines;
@@ -632,6 +656,10 @@ void Con_DrawConsole (int lines)
 
 // draw the input prompt, user text, and cursor if desired
 	Con_DrawInput ();
+
+#ifdef GLQUAKE
+	glDisable_fp (GL_BLEND);
+#endif
 }
 
 
