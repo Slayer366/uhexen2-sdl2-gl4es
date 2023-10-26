@@ -110,11 +110,10 @@ static pakdata_t old_pakdata[] =
 	{ 701,	20870,	23537707, "data1"	},	/* pak0.pak, original demo v0.42 from Aug. 1997
 							 *	(h2.exe -> console -> version says 1.07!)
 							 *	MD5: 208643a09193dafbca4b851762479438	*/
-/* !!! FIXME:  I don't have the original v1.08 of Continent of Blackmarsh. I only know the file sizes.	*/
-	{ -1,	0,	22719295, "data1"	},	/* pak0.pak, original oem (Matrox m3D) v1.08
-							 *	MD5: ????????????????????????????????	*/
-	{ -1,	0,	17739969, "data1"	},	/* pak2.pak, original oem (Matrox m3D) v1.08
-							 *	MD5: ????????????????????????????????	*/
+	{ 697,	43990,	22719295, "data1"	},	/* pak0.pak, original oem (Matrox m3D) v1.08
+							 *	MD5: 0477d62752fb6164a1761fa65b4dc384	*/
+	{ 183,	43596,	17739969, "data1"	},	/* pak2.pak, original oem (Matrox m3D) v1.08
+							 *	MD5: 404a93061049d09a82f609323f2695ae	*/
 	{  98,	25864,	10678369, "hw"	},		/* pak4.pak, Hexen2World v0.11 (ugh..)
 							 *	MD5: c311a30ac8ee1f112019723b4fe42268	*/
 	{  40,	48258,	 3357888, "hw"	},		/* pak4.pak, Hexen2World v0.09 (ugh ugh ugh!)
@@ -269,8 +268,8 @@ static pack_t *FS_LoadPackFile (const char *packfile, int paknum, qboolean base_
 	if (!packhandle)
 		return NULL;
 
-	fread (&header, 1, sizeof(header), packhandle);
-	if (header.id[0] != 'P' || header.id[1] != 'A' ||
+	if (!fread(&header, sizeof(header), 1, packhandle) ||
+	    header.id[0] != 'P' || header.id[1] != 'A' ||
 	    header.id[2] != 'C' || header.id[3] != 'K')
 	{
 		Sys_Printf ("WARNING: %s is not a packfile, ignored\n", packfile);
@@ -302,7 +301,8 @@ static pack_t *FS_LoadPackFile (const char *packfile, int paknum, qboolean base_
 	newfiles = (pakfiles_t *) Z_Malloc (numpackfiles * sizeof(pakfiles_t), Z_MAINZONE);
 
 	fseek (packhandle, header.dirofs, SEEK_SET);
-	fread (info,  1, header.dirlen, packhandle);
+	if (!fread(info, header.dirlen,  1, packhandle))
+		Sys_Error ("Error reading %s", packfile);
 
 	/* crc the directory */
 	CRC_Init (&crc);
@@ -919,7 +919,8 @@ static byte *FS_LoadFile (const char *path, int usehunk, unsigned int *path_id)
 	((byte *)buf)[len] = 0;
 
 	Draw_BeginDisc ();
-	fread (buf, 1, len, h);
+	if (!fread(buf, (size_t)len, 1, h))
+		Sys_Error ("%s: Error reading %s", __thisfunc__, path);
 	fclose (h);
 	Draw_EndDisc ();
 
@@ -1148,13 +1149,14 @@ static int CheckRegistered (void)
 	if (!h)
 		return -1;
 
-	fread (check, 1, sizeof(check), h);
+	i = (int) fread(check, sizeof(check), 1, h);
 	fclose (h);
+	if (!i) goto corrupt;
 
 	for (i = 0; i < 128; i++)
 	{
 		if (pop[i] != (unsigned short)BigShort(check[i]))
-		{
+		{  corrupt:
 			Sys_Printf ("Corrupted data file\n");
 			return -1;
 		}
