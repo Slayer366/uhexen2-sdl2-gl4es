@@ -1012,15 +1012,15 @@ static void M_ScanSaves (void)
 		loadable[i] = false;
 		FS_MakePath_VABUF (FS_USERDIR, NULL, name, sizeof(name), "s%i/info.dat", i);
 		f = fopen (name, "r");
-		if (!f)
+		if (!f) {
 			continue;
-		fscanf (f, "%i\n", &version);
-		if (version != SAVEGAME_VERSION)
-		{
+		}
+		if (fscanf(f, "%i\n", &version) != 1 ||
+		    fscanf(f, "%79s\n", name)   != 1 ||
+		    version != SAVEGAME_VERSION) {
 			fclose (f);
 			continue;
 		}
-		fscanf (f, "%79s\n", name);
 		q_strlcpy (m_filenames[i], name, SAVEGAME_COMMENT_LENGTH+1);
 
 	// change _ back to space
@@ -1202,15 +1202,15 @@ static void M_ScanMSaves (void)
 		loadable[i] = false;
 		FS_MakePath_VABUF (FS_USERDIR, NULL, name, sizeof(name), "ms%i/info.dat", i);
 		f = fopen (name, "r");
-		if (!f)
+		if (!f) {
 			continue;
-		fscanf (f, "%i\n", &version);
-		if (version != SAVEGAME_VERSION)
-		{
+		}
+		if (fscanf(f, "%i\n",&version) != 1 ||
+		    fscanf(f, "%79s\n", name)  != 1 ||
+		    version != SAVEGAME_VERSION) {
 			fclose (f);
 			continue;
 		}
-		fscanf (f, "%79s\n", name);
 		q_strlcpy (m_filenames[i], name, SAVEGAME_COMMENT_LENGTH+1);
 
 	// change _ back to space
@@ -3296,7 +3296,7 @@ static const char *CreditTextMP[MAX_LINES_MP] =
    "making of this game!"
 };
 
-#define	MAX_LINES2_MP	150
+#define	MAX_LINES2_MP	151
 
 static const char *Credit2TextMP[MAX_LINES2_MP] =
 {
@@ -3381,7 +3381,7 @@ static const char *Credit2TextMP[MAX_LINES2_MP] =
    "   Chad Bordwell,",
    "   David 'Spice Girl' Baker,",
    "   Error Casillas, Damien Fischer,",
-   "   Winnie Lee,"
+   "   Winnie Lee,",
    "   Ygor Krynytyskyy,",
    "   Samantha (Crusher) Lee, John Park",
    "   Ian Stevens, Chris Toft",
@@ -3554,11 +3554,20 @@ static void M_Quit_Draw (void)
 	M_DrawTextBox (0, 0, 38, 23);
 
 // the increment to the x offset is for properly centering the line
+
+#ifdef GLQUAKE
+glEnable_fp (GL_BLEND);
+#endif
+
 	M_Print      (16 + (8 * 8), y,		"Hexen II version " STRINGIFY(ENGINE_VERSION));
 	M_Print      (16 + (9 * 8), y + 8,	"by Raven Software");
 	M_PrintWhite (16 + (7 * 8), y + 16,	"Hammer of Thyrion " HOT_VERSION_STR);
 	M_PrintWhite (16 +(13 * 8), y + 24,	"Source Port");
 	y += 40;
+
+#ifdef GLQUAKE
+glDisable_fp (GL_BLEND);
+#endif
 
 	if (LinePos > 55 && !SoundPlayed && LineTxt2)
 	{
@@ -3591,7 +3600,16 @@ static void M_Quit_Draw (void)
 	}
 
 	y += (QUIT_SIZE * 8) + 8;
+
+#ifdef GLQUAKE
+glEnable_fp (GL_BLEND);
+#endif
+
 	M_PrintWhite (16 + (10 * 8), y,  "Press y to exit");
+
+#ifdef GLQUAKE
+glDisable_fp (GL_BLEND);
+#endif
 }
 
 //=============================================================================
@@ -4056,7 +4074,6 @@ static void M_ModemConfig_Key (int key)
 #endif	/* NET_USE_SERIAL */
 
 //=============================================================================
-
 /* LAN CONFIG MENU */
 
 static int	lanConfig_cursor = -1;
@@ -5038,6 +5055,10 @@ void M_Draw (void)
 		m_recursiveDraw = false;
 	}
 
+#ifdef GLQUAKE
+glEnable_fp (GL_BLEND);
+#endif
+
 	switch (m_state)
 	{
 	case m_none:
@@ -5133,6 +5154,10 @@ void M_Draw (void)
 		M_ServerList_Draw ();
 		break;
 	}
+
+#ifdef GLQUAKE
+glDisable_fp (GL_BLEND);
+#endif
 
 	if (m_entersound)
 	{
