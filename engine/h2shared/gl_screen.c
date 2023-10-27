@@ -1064,12 +1064,20 @@ static void I_Print (int cx, int cy, const char *str, int flags)
 
 	while (*s)
 	{
+#ifdef GLQUAKE
+	glEnable_fp (GL_BLEND);
+#endif
+
 		num = (unsigned char)(*s);
 		if (!(flags & INTERMISSION_PRINT_WHITE))
 			num += 256;
 		Draw_Character (x, y, num);
 		s++;
 		x += 8;
+
+#ifdef GLQUAKE
+	glDisable_fp (GL_BLEND);
+#endif
 	}
 }
 
