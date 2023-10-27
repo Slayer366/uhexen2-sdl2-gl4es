@@ -2,8 +2,12 @@ Hexen-II-for-GL4ES
 =====================
 
 Hexen II: Hammer of Thyrion (uHexen2) source code.
-http://uhexen2.sourceforge.net/
-http://sourceforge.net/projects/uhexen2/
+
+[https://github.com/sezero/uhexen2](https://github.com/sezero/uhexen2)
+
+[http://uhexen2.sourceforge.net](http://uhexen2.sourceforge.net)
+
+[http://sourceforge.net/projects/uhexen2](http://sourceforge.net/projects/uhexen2)
 
 ### Build with:
 ```bash
